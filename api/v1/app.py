@@ -1,38 +1,50 @@
 #!/usr/bin/python3
-"""Starting a threaded flask web application"""
-
-from api.v1.views import app_views
+"""Flask web application API.
+"""
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+
 from models import storage
-from os import environ, getenv
+from api.v1.views import app_views
+
 
 app = Flask(__name__)
-app.register_blueprint(app_views, url_prefix="/api/v1")
-cors = CORS(app, resources={r"/*": {"origins": "0.0.0.0"}})
-
-
-@app.errorhandler(404)
-def page_not_found(e):
-    """handler for 404 errors that returns a JSON-formatted 404 response"""
-    resp = jsonify({'error': 'Not found'})
-    resp.status_code = 404
-    return resp
+""" Flask web application instance."""
+app_host = os.getenv('HBNB_API_HOST', '0.0.0.0')
+app_port = int(os.getenv('HBNB_API_PORT', '5000'))
+app.url_map.strict_slashes = False
+app.register_blueprint(app_views)
+CORS(app, resources={'/*': {'origins': app_host}})
 
 
 @app.teardown_appcontext
-def teardown_storage(x):
-    """calls close() on storage"""
+def teardown_flask(exception):
+    """ Flask app/request context end event listener."""
+    # print(exception)
     storage.close()
 
 
+@app.errorhandler(404)
+def error_404(error):
+    """ Handles 404 HTTP error code."""
+    return jsonify(error='Not found'), 404
+
+
+@app.errorhandler(400)
+def error_400(error):
+    """ Handles 400 HTTP error code."""
+    msg = 'Bad request'
+    if isinstance(error, Exception) and hasattr(error, 'description'):
+        msg = error.description
+    return jsonify(error=msg), 400
+
+
 if __name__ == '__main__':
-    if 'HBNB_API_HOST' in environ:
-        hbnb_api_host = getenv('HBNB_API_HOST')
-    else:
-        hbnb_api_host = '0.0.0.0'
-    if 'HBNB_API_PORT' in environ:
-        hbnb_api_port = getenv('HBNB_API_PORT')
-    else:
-        hbnb_api_port = 5000
-    app.run(host=hbnb_api_host, port=hbnb_api_port, threaded=True)
+    app_host = os.getenv('HBNB_API_HOST', '0.0.0.0')
+    app_port = int(os.getenv('HBNB_API_PORT', '5000'))
+    app.run(
+        host=app_host,
+        port=app_port,
+        threaded=True
+    )
